@@ -813,9 +813,11 @@
      <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
      <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
      <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
      <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
      <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0"></script>
+     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+     <script src="https://cdn.jsdelivr.net/npm/tesseract.js"></script>
  </head>
  <body>
  
@@ -865,15 +867,15 @@
              </div>
 
              <div style="position: fixed; bottom: 20px; right: 20px; z-index: 1000;">
-                <!-- Toggle Button -->
-                <button id="toggle-button" style="padding: 10px; border-radius: 50%; background-color: #007BFF; color: white; border: none; font-size: 18px; cursor: pointer;">☰</button>
+
+                <button id="toggle-button" style="padding: 10px; border-radius: 50%; background-color: #89B7CC; color: white; border: none; font-size: 18px; cursor: pointer;">☰</button>
             
-                <!-- Hidden Button Group -->
+    
                 <div id="button-group" style="display: none; margin-top: 10px; text-align: center;">
-                    <button class="style-button" data-style="style1" style="padding: 10px; margin: 5px; border-radius: 5px; background-color: #007BFF; color: white; border: none; cursor: pointer;">Style 1</button>
-                    <button class="style-button" data-style="style2" style="padding: 10px; margin: 5px; border-radius: 5px; background-color: #007BFF; color: white; border: none; cursor: pointer;">Style 2</button>
-                    <button class="style-button" data-style="style3" style="padding: 10px; margin: 5px; border-radius: 5px; background-color: #007BFF; color: white; border: none; cursor: pointer;">Style 3</button>
-                    <button class="style-button" data-style="style4" style="padding: 10px; margin: 5px; border-radius: 5px; background-color: #007BFF; color: white; border: none; cursor: pointer;">Style 4</button>
+                    <button class="style-button" data-style="Conversational" style="padding: 10px; margin: 5px; border-radius: 5px; background-color: #89B7CC; color: white; border: none; cursor: pointer;">Conversational</button>
+                    <button class="style-button" data-style="Formal" style="padding: 10px; margin: 5px; border-radius: 5px; background-color: #89B7CC; color: white; border: none; cursor: pointer;">Formal</button>
+                    <button class="style-button" data-style="Humorous" style="padding: 10px; margin: 5px; border-radius: 5px; background-color: #89B7CC; color: white; border: none; cursor: pointer;">Humorous</button>
+                    <button class="style-button" data-style="Informative" style="padding: 10px; margin: 5px; border-radius: 5px; background-color: #89B7CC; color: white; border: none; cursor: pointer;">Informative</button>
                 </div>
             </div>
             
@@ -896,6 +898,8 @@
                  <div class="option" onclick="triggerImageUpload()" id="upload-image-button">📷 Upload Image</div>
                  <div class="option" onclick="startQuiz()">📚 Start Quiz</div>
                  <div class="option small-button" onclick="toggleVoiceCall()" id="voice-call-button">📞</div>
+                 <div class="option" onclick="startScreenShare()">🖥️ Share Screen</div>
+
              </div>
  
              <div id="message-input-container">
@@ -925,7 +929,264 @@
      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
  
      <script>
+    let mobilenetModel;
+    let modelLoaded = false;
 
+
+    window.addEventListener('DOMContentLoaded', () => {
+        loadModel();
+    });
+
+
+    async function loadModel() {
+        try {
+            displayMessage("🔄 Loading image recognition model...", "bot-message");
+            mobilenetModel = await mobilenet.load();
+            modelLoaded = true;
+            displayMessage("✅ Image recognition model loaded!", "bot-message");
+        } catch (err) {
+            console.error("Model load error:", err);
+            displayMessage("❌ Failed to load MobileNet model.", "bot-message");
+        }
+    }
+
+    async function startScreenShare() {
+    try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    } catch (err) {
+        console.error("Screen share error:", err);
+        
+        if (err.name === "NotAllowedError") {
+            displayMessage("❌ You denied the screen share prompt.", "bot-message");
+        } else if (err.name === "NotFoundError") {
+            displayMessage("❌ No screen display found or no screen was selected.", "bot-message");
+        } else {
+            displayMessage("❌ Screen share canceled or failed.", "bot-message");
+        }
+    }
+}
+
+
+    async function startScreenShare() {
+        try {
+   
+            const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            displayMessage("✅ Screen sharing started. Capturing a frame...", "bot-message");
+
+    
+            const video = document.createElement('video');
+            video.srcObject = screenStream;
+            video.autoplay = true;
+
+            await new Promise((resolve) => {
+                video.onplaying = resolve;
+            });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            screenStream.getTracks().forEach(track => track.stop());
+
+            const imageSrc = canvas.toDataURL('image/png');
+
+            displayMessage(`<img src="${imageSrc}" alt="Screen Capture" style="max-width:100%;"/>`, "user-message");
+
+            let objects = [];
+            if (!modelLoaded) {
+                displayMessage("⚠️ MobileNet not yet loaded. Loading now...", "bot-message");
+                await loadModel();
+            }
+            objects = await analyzeScreenImage(imageSrc);
+
+     
+            const text = await performScreenOCR(imageSrc);
+
+            const summary = generateScreenSummary(objects, text);
+            displayMessage(`📊 **Screen Summary (150 words)**:\n\n${summary}`, "bot-message");
+
+        } catch (err) {
+            console.error("Screen share error:", err);
+            displayMessage("❌ Screen share canceled or failed.", "bot-message");
+        }
+    }
+
+    async function analyzeScreenImage(imageSrc) {
+        const img = new Image();
+        img.src = imageSrc;
+        img.crossOrigin = "anonymous";
+        await img.decode();
+
+        const predictions = await mobilenetModel.classify(img);
+        if (predictions.length > 0) {
+            const objectList = predictions.map(
+                p => `${p.className} (${(p.probability*100).toFixed(2)}%)`
+            );
+            displayMessage(`📋 Objects Detected: ${objectList.join(", ")}`, "bot-message");
+            return objectList;
+        } else {
+            displayMessage("❓ No objects detected.", "bot-message");
+            return [];
+        }
+    }
+
+    async function performScreenOCR(imageSrc) {
+        displayMessage("🔍 Performing OCR on captured screen...", "bot-message");
+        try {
+            const { data: { text } } = await Tesseract.recognize(imageSrc, 'eng');
+            const trimmed = text.trim();
+            if (trimmed) {
+                displayMessage(`📝 Detected Text: ${trimmed}`, "bot-message");
+            } else {
+                displayMessage("No visible text found.", "bot-message");
+            }
+            return trimmed;
+        } catch (error) {
+            console.error("OCR error:", error);
+            displayMessage("❌ OCR failed on screen capture.", "bot-message");
+            return "";
+        }
+    }
+
+    function generateScreenSummary(objects, text) {
+        const objDescription = objects.length 
+            ? `Visually, the screen shows elements like: ${objects.join(", ")}. ` 
+            : "";
+        const txtDescription = text 
+            ? `Textually, some words or sentences appear, including: "${text}". `
+            : "";
+
+        let baseSummary = `
+These combined observations from both text and objects help ByteBuddy understand the user's current activity and on-screen context. 
+By recognizing certain objects (windows, icons, or other visual elements) and reading any textual content, ByteBuddy can provide more precise assistance and suggestions. 
+The snapshot indicates the user might be referencing or browsing specific materials, possibly for research, entertainment, or project-related tasks. 
+Overall, merging OCR and object detection facilitates a holistic view of the screen, allowing ByteBuddy to respond with relevant information, instructions, or clarifications.
+`.trim();
+
+       
+        let combined = objDescription + txtDescription + baseSummary;
+
+   
+        combined = limitToWords(combined, 150);
+        return combined;
+    }
+
+    function limitToWords(text, maxWords) {
+        const words = text.split(/\s+/);
+        if (words.length <= maxWords) return text;
+        return words.slice(0, maxWords).join(" ") + "...";
+    }
+
+
+    function displayMessage(text, className) {
+        const chatbox = document.getElementById("chatbox");
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message ${className}`;
+        messageDiv.innerHTML = text;
+        chatbox.appendChild(messageDiv);
+        chatbox.scrollTop = chatbox.scrollHeight;
+    }
+
+
+window.addEventListener('DOMContentLoaded', async () => {
+    try {
+        document.getElementById("output").innerText = "Loading models...";
+        mobilenetModel = await mobilenet.load();
+        console.log("Mobilenet loaded successfully!");
+        document.getElementById("output").innerText = "Models loaded. Upload an image!";
+    } catch (err) {
+        console.error("Error loading Mobilenet:", err);
+        document.getElementById("output").innerText = "Failed to load models.";
+    }
+});
+
+
+async function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        displayMessage("No file uploaded.", "error");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const imageSrc = e.target.result;
+        displayMessage(`<img src="${imageSrc}" alt="Uploaded Image" style="max-width:100%;"/>`, "image");
+        analyzeImage(imageSrc); // Perform Mobilenet analysis
+        performOCR(imageSrc); // Perform OCR analysis
+    };
+
+    reader.onerror = () => {
+        displayMessage("Error reading the file.", "error");
+    };
+
+    reader.readAsDataURL(file);
+}
+
+// Display messages or images in the output div
+function displayMessage(message, type = "text") {
+    const output = document.getElementById("output");
+    if (type === "image") {
+        output.innerHTML = message;
+    } else {
+        const messageDiv = document.createElement("div");
+        messageDiv.textContent = message;
+        output.appendChild(messageDiv);
+    }
+}
+
+// Analyze image with Mobilenet
+async function analyzeImage(imageSrc) {
+    try {
+        const img = new Image();
+        img.src = imageSrc;
+        img.crossOrigin = "anonymous";
+        img.onload = async () => {
+            const predictions = await mobilenetModel.classify(img);
+            if (predictions.length > 0) {
+                const objects = predictions.map(p => `${p.className} (${(p.probability * 100).toFixed(2)}%)`);
+                displayMessage(`Detected Objects: ${objects.join(", ")}`);
+                generateDescription(objects, null);
+            } else {
+                displayMessage("No objects detected.");
+            }
+        };
+    } catch (error) {
+        console.error("Error during image analysis:", error);
+        displayMessage("Error analyzing the image.");
+    }
+}
+
+async function performOCR(imageSrc) {
+    try {
+        displayMessage("Performing OCR...");
+        const { data: { text } } = await Tesseract.recognize(imageSrc, 'eng');
+        if (text.trim()) {
+            displayMessage(`Detected Text: ${text}`);
+            generateDescription(null, text);
+        } else {
+            displayMessage("No text detected in the image.");
+        }
+    } catch (error) {
+        console.error("Error during OCR:", error);
+        displayMessage("Error performing OCR.");
+    }
+}
+
+// Generate a 200-word description
+function generateDescription(objects, text) {
+    let description = "📝 Here's a description of the image:\n\n";
+    if (objects) {
+        description += `The image contains: ${objects.join(", ")}. `;
+    }
+    if (text) {
+        description += `It includes the text: "${text}". `;
+    }
+    description += "This combination provides a unique visual narrative and highlights the elements present in the scene.";
+    displayMessage(description);
+}
 
 const toggleButton = document.getElementById("toggle-button");
 const buttonGroup = document.getElementById("button-group");
@@ -984,87 +1245,7 @@ The uploaded file "${docName}" appears to be a valuable resource that may contai
 }
 
 
-        window.addEventListener('DOMContentLoaded', async () => {
-            try {
-                await Promise.all([
-                faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
-                faceapi.nets.faceLandmark68Net.loadFromUri('./models'),
-                faceapi.nets.faceRecognitionNet.loadFromUri('./models'),
-                faceapi.nets.faceExpressionNet.loadFromUri('./models')
-                ]);
-                displayMessage("Face-api.js models loaded successfully!", "bot-message");
-            } catch (err) {
-                console.error("Error loading face-api models:", err);
-            }
-            try {
-                displayMessage("Loading mobilenet model...", "bot-message");
-                window.mobilenetModel = await mobilenet.load();
-                displayMessage("Mobilenet model loaded successfully!", "bot-message");
-            } catch (error) {
-                console.error("Mobilenet load error:", error);
-                displayMessage("❌ Failed to load mobilenet model.", "bot-message");
-            }
-            });
-
-            const fileInput = document.getElementById('image-upload');
-    fileInput.addEventListener('change', async (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      if (!file.type.startsWith('image/')) {
-        displayMessage("❌ Please upload a valid image file.", "bot-message");
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const imageSrc = e.target.result;
-        displayMessage(`<img src="${imageSrc}" alt="Uploaded Image" />`, "user-message");
-
-        displayMessage("🔄 Performing OCR (detecting text)...", "bot-message");
-        try {
-          const { data: { text } } = await Tesseract.recognize(imageSrc, 'eng', {
-
-            logger: m => console.log(m)
-          });
-          if (text.trim()) {
-            displayMessage("📝 **Detected Text**:\n" + text, "bot-message");
-          } else {
-            displayMessage("❌ No text detected.", "bot-message");
-          }
-        } catch (error) {
-          console.error("OCR Error:", error);
-          displayMessage("❌ An error occurred while performing OCR.", "bot-message");
-        }
-
-
-        displayMessage("🔎 Detecting faces...", "bot-message");
-        await detectFaces(imageSrc);
-
-
-        if (window.mobilenetModel) {
-          try {
-            const classifications = await classifyImageWithMobilenet(imageSrc);
-            if (classifications.length > 0) {
-              let reply = "📋 I think this image contains:";
-              for (let i = 0; i < classifications.length; i++) {
-                const c = classifications[i];
-                reply += `\n${i+1}) ${c.className} (${(c.probability*100).toFixed(2)}%)`;
-              }
-              displayMessage(reply, "bot-message");
-            } else {
-              displayMessage("❓ I couldn't recognize anything in the image.", "bot-message");
-            }
-          } catch (error) {
-            console.error("Mobilenet classification error:", error);
-            displayMessage("❌ An error occurred while classifying the image.", "bot-message");
-          }
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-
-
+ 
 
     async function generateSpeech() {
             const topic = document.getElementById("topic-input").value;
@@ -1108,90 +1289,6 @@ The uploaded file "${docName}" appears to be a valuable resource that may contai
             }
         }
 
-    async function detectFaces(imageSrc) {
-      const img = new Image();
-      img.src = imageSrc;
-      img.crossOrigin = "anonymous";
-      return new Promise((resolve, reject) => {
-        img.onload = async () => {
-          try {
-
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0);
-
-
-            const detections = await faceapi
-              .detectAllFaces(canvas, new faceapi.TinyFaceDetectorOptions())
-              .withFaceLandmarks()
-              .withFaceExpressions();
-
-            if (detections.length > 0) {
-              let message = `👀 Detected ${detections.length} face(s).`;
-              detections.forEach((det, index) => {
-                const box = det.detection.box;
-                message += `\nFace #${index + 1} => x:${box.x.toFixed(0)}, y:${box.y.toFixed(0)}, w:${box.width.toFixed(0)}, h:${box.height.toFixed(0)}`;
-              });
-              displayMessage(message, "bot-message");
-            } else {
-              displayMessage("❌ No faces detected in this image.", "bot-message");
-            }
-
-            resolve();
-          } catch (err) {
-            console.error("Face detection error:", err);
-            displayMessage("❌ Error during face detection.", "bot-message");
-            reject(err);
-          }
-        };
-        img.onerror = () => {
-          displayMessage("❌ Failed to load image for face detection.", "bot-message");
-          reject();
-        };
-      });
-    }
-
-    async function classifyImageWithMobilenet(imageSrc) {
-      if (!window.mobilenetModel) return [];
-
-      // Convert base64 to HTMLImageElement
-      const img = new Image();
-      img.src = imageSrc;
-      img.crossOrigin = "anonymous";
-
-      return new Promise((resolve, reject) => {
-        img.onload = async () => {
-          try {
-            const predictions = await window.mobilenetModel.classify(img);
-            resolve(predictions);
-          } catch (error) {
-            reject(error);
-          }
-        };
-        img.onerror = () => {
-          reject("Image load error");
-        };
-      });
-    }
-
-    function displayMessage(text, className) {
-      const chatbox = document.getElementById('chatbox');
-      const msgDiv = document.createElement('div');
-      msgDiv.className = `message ${className}`;
-      
-
-      if (text.startsWith('<img')) {
-        msgDiv.classList.add('image-message');
-        msgDiv.innerHTML = text;
-      } else {
-        msgDiv.innerText = text;
-      }
-      
-      chatbox.appendChild(msgDiv);
-      chatbox.scrollTop = chatbox.scrollHeight;
-    }
 
          let distilGPT2;
  
@@ -1570,6 +1667,17 @@ The uploaded file "${docName}" appears to be a valuable resource that may contai
                  if (input === "simplify your answer") {
                      return await this.simplifyLastAnswer();
                  }
+
+                 if (this.isQuadraticRequest(input) || this.isQuadraticEquation(input)) {
+                    const equation = this.extractQuadraticEquation(input);
+                    if (equation) {
+                        const steps = this.solveQuadraticEquation(equation);
+                        this.lastAnswer = steps.join('<br>');
+                        return steps.join('<br>');
+                    } else {
+                        return "❗ I couldn't parse the quadratic equation. Please ensure it's in the form ax² + bx + c = 0.";
+                    }
+                }
  
                  if (input === "improve your answer") {
                      return await this.improveLastAnswer();
@@ -2358,8 +2466,6 @@ The uploaded file "${docName}" appears to be a valuable resource that may contai
              chatbot = new Chatbot();
          }
  
-         let model;
-         let modelLoaded = false;
  
          async function loadModel() {
              displayMessage("🔄 Loading image recognition model...", "bot-message");
